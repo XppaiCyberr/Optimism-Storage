@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OptimismStorage Interface</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+            background-color: #f8f9fa;
+        }
+        .container {
+            background-color: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #ff0420;
+            margin-top: 0;
+            border-bottom: 2px solid #ff0420;
+            padding-bottom: 10px;
+        }
+        .card {
+            background-color: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e0e0e0;
+        }
+        button {
+            background-color: #ff0420;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 10px 15px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #d10016;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        input {
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            width: 100%;
+            box-sizing: border-box;
+            margin-bottom: 15px;
+        }
+        .alert {
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        .alert-info {
+            background-color: #e8f4fd;
+            border-left: 4px solid #3498db;
+        }
+        .alert-success {
+            background-color: #e9f7ef;
+            border-left: 4px solid #2ecc71;
+        }
+        .alert-danger {
+            background-color: #fde8e8;
+            border-left: 4px solid #e74c3c;
+        }
+        .info-box {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+        .info-item {
+            flex: 1;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            margin-right: 10px;
+        }
+        .info-item:last-child {
+            margin-right: 0;
+        }
+        .info-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .info-value {
+            font-weight: bold;
+            word-break: break-all;
+        }
+        #events {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .event-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .event-item:last-child {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>OptimismStorage Interface</h1>
+        
+        <div class="alert alert-info" id="networkInfo">
+            Please connect your wallet to interact with the contract
+        </div>
+        
+        <div class="card">
+            <h3>Connection</h3>
+            <div class="info-box">
+                <div class="info-item">
+                    <div class="info-label">Network</div>
+                    <div class="info-value" id="network">Not connected</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Account</div>
+                    <div class="info-value" id="account">Not connected</div>
+                </div>
+            </div>
+            <button id="connectWallet">Connect Wallet</button>
+            <button id="switchNetwork" style="display: none;">Switch to Optimism</button>
+        </div>
+
+        <div class="card">
+            <h3>Contract Information</h3>
+            <div class="info-box">
+                <div class="info-item">
+                    <div class="info-label">Contract Address</div>
+                    <div class="info-value">0xc52078Cb73880CC1F3A830df3c1d9B1c8Edc0338</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Owner Address</div>
+                    <div class="info-value" id="ownerAddress">Loading...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Current Value</h3>
+            <div class="info-box">
+                <div class="info-item">
+                    <div class="info-label">Stored Value</div>
+                    <div class="info-value" id="currentValue">Loading...</div>
+                </div>
+            </div>
+            <button id="getValue">Refresh Value</button>
+        </div>
+
+        <div class="card">
+            <h3>Update Value</h3>
+            <p>Only the contract owner can update the value.</p>
+            <input type="number" id="newValue" placeholder="Enter new value">
+            <button id="setValue">Set Value</button>
+        </div>
+
+        <div class="card">
+            <h3>Event Log (ValueUpdated)</h3>
+            <div id="events">
+                <div class="event-item">Connect wallet to see events</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Contract ABI
+        const contractABI = [
+            {"inputs":[{"internalType":"uint256","name":"_initialValue","type":"uint256"}],"stateMutability":"nonpayable","type":"constructor"},
+            {"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"newValue","type":"uint256"},{"indexed":true,"internalType":"address","name":"updatedBy","type":"address"}],"name":"ValueUpdated","type":"event"},
+            {"inputs":[],"name":"getValue","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+            {"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"internalType":"uint256","name":"_newValue","type":"uint256"}],"name":"setValue","outputs":[],"stateMutability":"nonpayable","type":"function"}
+        ];
+        
+        // Contract address
+        const contractAddress = "0xc52078Cb73880CC1F3A830df3c1d9B1c8Edc0338";
+        
+        // Global variables
+        let provider;
+        let signer;
+        let contract;
+        let currentAccount;
+        let isOwner = false;
+        let isOptimismNetwork = false;
+
+        // Elements
+        const connectWalletBtn = document.getElementById('connectWallet');
+        const switchNetworkBtn = document.getElementById('switchNetwork');
+        const networkInfoEl = document.getElementById('networkInfo');
+        const networkEl = document.getElementById('network');
+        const accountEl = document.getElementById('account');
+        const ownerAddressEl = document.getElementById('ownerAddress');
+        const currentValueEl = document.getElementById('currentValue');
+        const getValueBtn = document.getElementById('getValue');
+        const newValueInput = document.getElementById('newValue');
+        const setValueBtn = document.getElementById('setValue');
+        const eventsEl = document.getElementById('events');
+
+        // Initialize
+        async function init() {
+            if (window.ethereum) {
+                try {
+                    // Create provider
+                    provider = new ethers.BrowserProvider(window.ethereum);
+                    
+                    // Add event listeners
+                    connectWalletBtn.addEventListener('click', connectWallet);
+                    switchNetworkBtn.addEventListener('click', switchToOptimism);
+                    getValueBtn.addEventListener('click', fetchCurrentValue);
+                    setValueBtn.addEventListener('click', updateValue);
+                    
+                    // Check if already connected
+                    const accounts = await provider.listAccounts();
+                    if (accounts.length > 0) {
+                        await connectWallet();
+                    }
+
+                    // Listen for account changes
+                    window.ethereum.on('accountsChanged', handleAccountsChanged);
+                    
+                    // Listen for chain changes
+                    window.ethereum.on('chainChanged', handleChainChanged);
+                } catch (error) {
+                    console.error("Initialization error:", error);
+                    showAlert("Failed to initialize application. Please refresh and try again.", "danger");
+                }
+            } else {
+                showAlert("Ethereum wallet not detected. Please install MetaMask.", "danger");
+                connectWalletBtn.disabled = true;
+            }
+        }
+
+        // Connect wallet
+        async function connectWallet() {
+            try {
+                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                currentAccount = accounts[0];
+                
+                // Update UI
+                accountEl.textContent = formatAddress(currentAccount);
+                
+                // Get network info and check if we're on Optimism
+                await checkNetwork();
+                
+                if (isOptimismNetwork) {
+                    await setupContract();
+                }
+            } catch (error) {
+                console.error("Connection error:", error);
+                showAlert("Failed to connect wallet: " + error.message, "danger");
+            }
+        }
+
+        // Check network
+        async function checkNetwork() {
+            try {
+                const network = await provider.getNetwork();
+                networkEl.textContent = network.name;
+                
+                // Check if we're on Optimism
+                isOptimismNetwork = network.chainId === 10n;
+                
+                if (!isOptimismNetwork) {
+                    switchNetworkBtn.style.display = "inline-block";
+                    showAlert("Please switch to Optimism network to interact with this contract", "danger");
+                } else {
+                    switchNetworkBtn.style.display = "none";
+                }
+                
+                return isOptimismNetwork;
+            } catch (error) {
+                console.error("Error checking network:", error);
+                showAlert("Error checking network: " + error.message, "danger");
+                return false;
+            }
+        }
+
+        // Switch to Optimism
+        async function switchToOptimism() {
+            try {
+                await window.ethereum.request({
+                    method: 'wallet_switchEthereumChain',
+                    params: [{ chainId: '0xA' }], // Optimism chainId in hex
+                });
+                
+                // The chain changed event will handle the rest
+            } catch (error) {
+                console.error("Failed to switch network:", error);
+                
+                // If the network doesn't exist, add it
+                if (error.code === 4902) {
+                    try {
+                        await window.ethereum.request({
+                            method: 'wallet_addEthereumChain',
+                            params: [{
+                                chainId: '0xA',
+                                chainName: 'Optimism',
+                                nativeCurrency: {
+                                    name: 'Ether',
+                                    symbol: 'ETH',
+                                    decimals: 18
+                                },
+                                rpcUrls: ['https://mainnet.optimism.io'],
+                                blockExplorerUrls: ['https://optimistic.etherscan.io']
+                            }]
+                        });
+                    } catch (addError) {
+                        console.error("Failed to add Optimism network:", addError);
+                        showAlert("Failed to add Optimism network: " + addError.message, "danger");
+                    }
+                } else {
+                    showAlert("Failed to switch to Optimism: " + error.message, "danger");
+                }
+            }
+        }
+
+        // Setup contract
+        async function setupContract() {
+            try {
+                // Create contract instance
+                signer = await provider.getSigner();
+                contract = new ethers.Contract(contractAddress, contractABI, signer);
+                
+                // Get owner and check if current user is owner
+                const ownerAddress = await contract.owner();
+                ownerAddressEl.textContent = formatAddress(ownerAddress);
+                
+                isOwner = ownerAddress.toLowerCase() === currentAccount.toLowerCase();
+                if (!isOwner) {
+                    setValueBtn.disabled = true;
+                    showAlert("You are not the contract owner, so you cannot update the value", "info");
+                } else {
+                    setValueBtn.disabled = false;
+                    showAlert("You are the contract owner and can update the stored value", "success");
+                }
+                
+                // Fetch current value
+                await fetchCurrentValue();
+                
+                // Setup event listener
+                setupEventListener();
+                
+                return true;
+            } catch (error) {
+                console.error("Error setting up contract:", error);
+                showAlert("Error interacting with contract: " + error.message, "danger");
+                return false;
+            }
+        }
+
+        // Handle account changes
+        function handleAccountsChanged(accounts) {
+            if (accounts.length === 0) {
+                // Disconnected
+                currentAccount = null;
+                accountEl.textContent = "Not connected";
+                networkEl.textContent = "Not connected";
+                showAlert("Wallet disconnected", "info");
+            } else if (accounts[0] !== currentAccount) {
+                // Account changed - refresh the page to reset state
+                window.location.reload();
+            }
+        }
+
+        // Handle chain changes
+        async function handleChainChanged(chainIdHex) {
+            // Refresh provider
+            provider = new ethers.BrowserProvider(window.ethereum);
+            
+            // Check if we're on Optimism
+            await checkNetwork();
+            
+            if (isOptimismNetwork) {
+                await setupContract();
+            } else {
+                ownerAddressEl.textContent = "Switch to Optimism";
+                currentValueEl.textContent = "Switch to Optimism";
+                eventsEl.innerHTML = "<div class='event-item'>Switch to Optimism to see events</div>";
+            }
+        }
+
+        // Fetch current value
+        async function fetchCurrentValue() {
+            if (!contract) {
+                if (!isOptimismNetwork) {
+                    showAlert("Please switch to Optimism network first", "info");
+                } else {
+                    showAlert("Please connect your wallet first", "info");
+                }
+                return;
+            }
+            
+            try {
+                const value = await contract.getValue();
+                currentValueEl.textContent = value.toString();
+                showAlert("Value successfully retrieved", "success");
+            } catch (error) {
+                console.error("Error fetching value:", error);
+                showAlert("Failed to fetch current value: " + error.message, "danger");
+            }
+        }
+
+        // Update value
+        async function updateValue() {
+            if (!contract) {
+                if (!isOptimismNetwork) {
+                    showAlert("Please switch to Optimism network first", "info");
+                } else {
+                    showAlert("Please connect your wallet first", "info");
+                }
+                return;
+            }
+            
+            if (!isOwner) {
+                showAlert("Only the contract owner can update the value", "danger");
+                return;
+            }
+            
+            const newValue = newValueInput.value.trim();
+            if (!newValue) {
+                showAlert("Please enter a value", "danger");
+                return;
+            }
+            
+            try {
+                setValueBtn.disabled = true;
+                showAlert("Transaction pending...", "info");
+                
+                const tx = await contract.setValue(newValue);
+                showAlert("Transaction submitted. Waiting for confirmation...", "info");
+                
+                await tx.wait();
+                await fetchCurrentValue();
+                
+                showAlert("Value successfully updated", "success");
+                newValueInput.value = "";
+            } catch (error) {
+                console.error("Error updating value:", error);
+                showAlert("Failed to update value: " + error.message, "danger");
+            } finally {
+                if (isOwner) {
+                    setValueBtn.disabled = false;
+                }
+            }
+        }
+
+        // Setup event listener
+        function setupEventListener() {
+            if (!contract) return;
+            
+            // Clear events
+            eventsEl.innerHTML = "";
+            
+            // Listen for ValueUpdated events
+            contract.on("ValueUpdated", (newValue, updatedBy, event) => {
+                const eventItem = document.createElement("div");
+                eventItem.className = "event-item";
+                eventItem.innerHTML = `
+                    <div><strong>New Value:</strong> ${newValue.toString()}</div>
+                    <div><strong>Updated By:</strong> ${formatAddress(updatedBy)}</div>
+                    <div><strong>Block:</strong> ${event.blockNumber}</div>
+                `;
+                
+                eventsEl.insertBefore(eventItem, eventsEl.firstChild);
+            });
+            
+            // Get past events
+            getPastEvents();
+        }
+
+        // Get past events
+        async function getPastEvents() {
+            if (!contract || !provider) return;
+            
+            try {
+                // Create a filter for the ValueUpdated event
+                const filter = contract.filters.ValueUpdated();
+                
+                // Get the logs - we'll look at the last 1000 blocks as an example
+                const blockNumber = await provider.getBlockNumber();
+                const startBlock = Math.max(0, blockNumber - 1000); // Last 1000 blocks or from beginning
+                
+                const logs = await provider.getLogs({
+                    address: contractAddress,
+                    topics: filter.topics,
+                    fromBlock: startBlock,
+                    toBlock: 'latest'
+                });
+                
+                if (logs.length === 0) {
+                    eventsEl.innerHTML = "<div class='event-item'>No events found</div>";
+                    return;
+                }
+                
+                // Parse and display events
+                for (const log of logs) {
+                    try {
+                        const parsedLog = contract.interface.parseLog(log);
+                        
+                        if (parsedLog && parsedLog.name === "ValueUpdated") {
+                            const eventItem = document.createElement("div");
+                            eventItem.className = "event-item";
+                            eventItem.innerHTML = `
+                                <div><strong>New Value:</strong> ${parsedLog.args[0].toString()}</div>
+                                <div><strong>Updated By:</strong> ${formatAddress(parsedLog.args[1])}</div>
+                                <div><strong>Block:</strong> ${log.blockNumber}</div>
+                            `;
+                            
+                            eventsEl.insertBefore(eventItem, eventsEl.firstChild);
+                        }
+                    } catch (parseError) {
+                        console.error("Error parsing log:", parseError);
+                    }
+                }
+            } catch (error) {
+                console.error("Error getting past events:", error);
+                eventsEl.innerHTML = "<div class='event-item'>Error loading events</div>";
+            }
+        }
+
+        // Format address
+        function formatAddress(address) {
+            return address.substring(0, 6) + "..." + address.substring(address.length - 4);
+        }
+
+        // Show alert
+        function showAlert(message, type) {
+            networkInfoEl.className = `alert alert-${type}`;
+            networkInfoEl.textContent = message;
+        }
+
+        // Initialize application
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
