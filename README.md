@@ -2,7 +2,7 @@
 
 A decentralized application for interacting with a simple storage contract on the Optimism network.
 
-![OptimismStorage Interface](https://api.placeholder.com/400/320?text=OptimismStorage+Interface)
+![OptimismStorage Interface](interface.png)
 
 ## Overview
 
@@ -12,6 +12,9 @@ This project demonstrates a basic interaction pattern between a web frontend and
 - Update the stored value (owner only)
 - View past value update events
 - Monitor transaction status
+
+## Demo
+- [Demo Interface](https://optimism.xppai.io/)
 
 ## Smart Contract
 
